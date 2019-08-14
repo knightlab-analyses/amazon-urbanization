@@ -1,0 +1,249 @@
+---
+title: "R Notebook Amazon analysis part Chris"
+output: html_notebook
+author: "Chris Callewaert"
+---
+
+```{r}
+# Load packages:
+library(plyr)
+library(doBy)
+library(survival)
+library(coin)
+library(ggplot2)
+library(lattice)
+library(hexbin)
+library(randomForest)
+library(ggthemes)
+library(reshape2)
+library(ca)
+library(FactoMineR)
+library(MASS)
+library(rgl)
+library(grid)
+library(missMDA)
+library(plotrix)
+library(stats)
+library(gdata)
+library(psych)
+library(corrplot)
+library(ggsignif)
+```
+
+```{r}
+### Read in data:
+df11b <- read.csv("df11n.txt", header=TRUE, sep="\t", stringsAsFactors=FALSE)
+df11bmetadata <- read.csv("df11o.txt", header=TRUE, sep="\t", stringsAsFactors=FALSE)
+ImpMSd <- read.csv("ImpMSd.txt", header=TRUE, sep="\t", stringsAsFactors=FALSE)
+Diversity_d <- read.csv("Diversity_d.txt", header=TRUE, sep="\t", stringsAsFactors=FALSE)
+```
+
+# Village order in boxplots:
+df11b$village_socio2<-factor(df11b$village_socio2, levels=c("Checherta","Puerto Almendras","Iquitos","Manaus low","Manaus middle"))
+df11bmetadata$village_socio2<-factor(df11bmetadata$village_socio2, levels=c("Checherta","Puerto Almendras","Iquitos","Manaus low","Manaus middle"))
+
+
+#Fig S16 - FigS12
+# ITS
+ggplot(subset(df11b, village_socio2 %in% c("Checherta","Puerto Almendras","Iquitos","Manaus low","Manaus middle") & host_type2 %in% c("animal", "bed/livingroom", "kitchen", "floor","wall","human gut","human nose","human oral","human skin arm","human skin foot","human skin hand")), aes(x = village_socio2, y = Shannon_ITS_new, fill = village_socio2)) + 
+  geom_boxplot() + theme_bw() +
+  theme(panel.grid = element_blank()) + 
+  xlab("Village") + ylab("Shannon ITS fungal diversity") + ggtitle("ITS") +
+  scale_fill_manual(values=c("#FF0000","#008000","#0000FF","#FFFF00","#f27304")) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5), plot.title = element_text(hjust = 0.5)) +
+  theme(legend.position = "none", axis.text.x=element_blank(), axis.ticks.x=element_blank(),axis.title.x=element_blank()) +
+  facet_wrap(~host_type2,nrow=1) 
+
+# 18S (no APF)
+ggplot(subset(df11b, village %in% c("Checherta","Puerto Almendras","Iquitos","Manaus") & host_type2 %in% c("animal", "bed/livingroom", "kitchen", "floor","wall","human gut","human nose","human oral","human skin arm","human skin foot","human skin hand")), aes(x = village, y = Shannon_18S2, fill = village)) + 
+  geom_boxplot() + theme_bw() +
+  theme(panel.grid = element_blank()) + 
+  xlab("Village") + ylab("Shannon eukaryotic diversity") + ggtitle("18S") +
+  scale_fill_manual(values=c("#FF0000","#008000","#0000FF","#f27304")) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5), plot.title = element_text(hjust = 0.5)) +
+  theme(legend.position = "none", axis.text.x=element_blank(), axis.ticks.x=element_blank(),axis.title.x=element_blank()) +
+  facet_wrap(~host_type2,nrow=1) 
+
+# 16S
+ggplot(subset(df11b, village_socio2 %in% c("Checherta","Puerto Almendras","Iquitos","Manaus low","Manaus middle") & host_type2 %in% c("animal", "bed/livingroom", "kitchen", "floor","wall","human gut","human nose","human oral","human skin arm","human skin foot","human skin hand")), aes(x = village_socio2, y = Shannon_16S_new, fill = village_socio2)) + 
+  geom_boxplot() + theme_bw() +
+  theme(panel.grid = element_blank()) + 
+  xlab("Village") + ylab("Shannon bacterial diversity") + ggtitle("16S") +
+  scale_fill_manual(values=c("#FF0000","#008000","#0000FF","#FFFF00","#f27304")) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5), plot.title = element_text(hjust = 0.5)) +
+  theme(legend.position = "none", axis.text.x=element_blank(), axis.ticks.x=element_blank(),axis.title.x=element_blank()) +
+  facet_wrap(~host_type2,nrow=1) 
+ggplot(subset(df11b, village_socio2 %in% c("Checherta","Puerto Almendras","Iquitos","Manaus low","Manaus middle") & host_type2 %in% c("animal", "bed/livingroom", "kitchen", "floor","wall","human gut","human nose","human oral","human skin arm","human skin foot","human skin hand")), aes(x = village_socio2, y = Chao1_16S_new, fill = village_socio2)) + 
+  geom_boxplot() + theme_bw() +
+  theme(panel.grid = element_blank()) + 
+  xlab("Village") + ylab("Chao1 bacterial richness") + ggtitle("16S") +
+  scale_fill_manual(values=c("#FF0000","#008000","#0000FF","#FFFF00","#f27304")) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust=0.5), plot.title = element_text(hjust = 0.5)) +
+  theme(legend.position = "none", axis.text.x=element_blank(), axis.ticks.x=element_blank(),axis.title.x=element_blank()) +
+  facet_wrap(~host_type2,nrow=1) 
+
+
+#Fig S21a - Fig 3a
+ImpMS_e <- ImpMSd[,-1]
+rownames(ImpMS_e) <- ImpMSd[,1]
+Diversity_e <- Diversity_d[,-1]
+rownames(Diversity_e) <- Diversity_d[,1]
+
+res3 <- cor(ImpMS_e, Diversity_e, use = "pairwise.complete.obs")
+res3
+
+pdf(file = "Corrplot6ba.pdf", width = 10, height = 7, family = "Helvetica", pointsize=14, useDingbats=FALSE)
+corrplot(res3, method="color", tl.col = "black", na.label = ".")
+dev.off()
+
+#Fig S21b - Fig 3b
+pdf(file = "Shannon ITS vs Shannon MS d.pdf", width = 6.5, height = 5, family = "Helvetica", useDingbats=FALSE)
+ggplot(df11b, aes(x=Shannon_MS, y=Shannon_ITS_new)) + geom_point(shape=1, size = 2.5) + geom_smooth(method=lm, se=FALSE, color="black") +
+  theme_bw() + theme(panel.grid = element_blank(), text = element_text(size = 16, colour="black"), axis.text=element_text(colour="black"), legend.position = "TRUE") + 
+  theme(plot.margin = unit(c(0.2,1,0.2,0.2), "cm")) +
+  xlab("Shannon chemical diversity (MS)") + ylab("Shannon fungal diversity (ITS)") +
+  geom_text(x=4.1, y=7.5, size=5, label="p<2.2e-16") + geom_text(x=4.1, y=8, size=5, label="Spearman") + geom_text(x=4.1, y=7, size=5, label="rho=0.4040")
+dev.off()
+
+spearman_test(df11b$Shannon_MS~df11b$Shannon_ITS_new,distribution=approximate(B=10000))
+cor.test(df11b$Shannon_MS,df11b$Shannon_ITS_new,method="spearman") 
+
+# Fig S21c - Fig 3c
+pdf(file = "Urbanization score vs Shannon ITS b.pdf", width = 6.5, height = 5, family = "Helvetica", useDingbats=FALSE)
+ggplot(subset(df11bmetadata, host_type %in% c("house")), aes(x=accult_score_corrected2, y=Shannon_ITS)) + 
+  geom_point(shape=1, size = 2.5) + geom_smooth(method=lm, se=FALSE, color="black") +
+  theme_bw() + theme(panel.grid = element_blank(), text = element_text(size = 16, colour="black"), axis.text=element_text(colour="black"), legend.position = "TRUE") + 
+  theme(plot.margin = unit(c(0.2,1,0.2,0.2), "cm")) +
+  xlab("Urbanization score") + ylab("Shannon fungal diversity (ITS)") +
+  geom_text(x=4, y=7.5, size=5, label="p<2.2e-16") + geom_text(x=4, y=8, size=5, label="Spearman") + geom_text(x=4, y=7, size=5, label="rho=0.3477")
+dev.off()
+
+spearman_test(Shannon_ITS~accult_score_corrected2,data=df11bmetadata,distribution=approximate(B=10000))
+cor.test(df11bmetadata2$accult_score_corrected2,df11bmetadata2$Shannon_ITS,method="spearman") 
+
+
+# Fig S22 - S19 - AsthmaYN, AllergyYN, ParasitesYN, Autoimmune.diseaseYN, Western.diseaseYN
+ggplot(subset(df11bmetadata, sample_site_general %in% c("human skin") & AsthmaYN %in% c("No", "Yes")), aes(y = as.numeric(Shannon_16S), x = AsthmaYN)) + 
+  geom_boxplot(outlier.size = NA) + theme_bw() +
+  theme(panel.grid = element_blank(), text = element_text(size = 18, colour="black"), axis.text=element_text(colour="black")) +
+  geom_point(position = position_jitter(width = 0.25), shape=21, size=2) +
+  geom_signif(comparisons=list(c("Yes", "No")), map_signif_level=FALSE, tip_length=0.01, textsize=4.5, vjust=0) +
+  xlab("Self-reported asthma") + ylab("Bacterial Shannon diversity") +
+  facet_wrap(~sample_site_general) 
+ggplot(subset(df11bmetadata, sample_site_general %in% c("human skin") & AsthmaYN %in% c("No", "Yes")), aes(y = Shannon_ITS, x = AsthmaYN)) + 
+  geom_boxplot(outlier.size = NA) + theme_bw() +
+  theme(panel.grid = element_blank()) +
+  geom_point(position = position_jitter(width = 0.25), shape=21) +
+  geom_signif(comparisons=list(c("Yes", "No")), map_signif_level=FALSE, tip_length=0.01, textsize=3, vjust=0) +
+  xlab("Asthma") + ylab("Fungal Shannon diversity") +
+  facet_wrap(~sample_site_general) 
+
+ggplot(subset(df11bmetadata, sample_site_general %in% c("human skin") & AllergyYN %in% c("No", "Yes")), aes(y = chao_16S, x = AllergyYN)) + 
+  geom_boxplot(outlier.size = NA) + theme_bw() +
+  theme(panel.grid = element_blank(), text = element_text(size = 18, colour="black"), axis.text=element_text(colour="black")) +
+  geom_point(position = position_jitter(width = 0.25), shape=21, size=2) +
+  geom_signif(comparisons=list(c("Yes", "No")), map_signif_level=FALSE, tip_length=0.01, textsize=4.5, vjust=0) +
+  xlab("Self-reported allergy") + ylab("Bacterial Chao1 richness") +
+  facet_wrap(~sample_site_general) 
+
+ggplot(subset(df11bmetadata, sample_site_general %in% c("human skin") & AllergyYN %in% c("No", "Yes")), aes(y = Shannon_ITS, x = AllergyYN)) + 
+  geom_boxplot(outlier.size = NA) + theme_bw() +
+  theme(panel.grid = element_blank(), text = element_text(size = 18, colour="black"), axis.text=element_text(colour="black")) +
+  geom_point(position = position_jitter(width = 0.25), shape=21, size=2) +
+  geom_signif(comparisons=list(c("Yes", "No")), map_signif_level=FALSE, tip_length=0.01, textsize=4.5, vjust=0) +
+  xlab("Self-reported allergy") + ylab("Fungal Shannon diversity") +
+  facet_wrap(~sample_site_general) 
+
+ggplot(subset(df11bmetadata, sample_site_general %in% c("human skin") & ParasitesYN %in% c("No", "Yes")), aes(y = chao_16S, x = ParasitesYN)) + 
+  geom_boxplot(outlier.size = NA) + theme_bw() +
+  theme(panel.grid = element_blank(), text = element_text(size = 18, colour="black"), axis.text=element_text(colour="black")) +
+  geom_point(position = position_jitter(width = 0.25), shape=21, size=2) +
+  geom_signif(comparisons=list(c("Yes", "No")), map_signif_level=FALSE, tip_length=0.01, textsize=4.5, vjust=0) +
+  xlab("Fecal parasites detected") + ylab("Bacterial Chao1 richness") +
+  facet_wrap(~sample_site_general) 
+
+ggplot(subset(df11bmetadata, sample_site_general %in% c("human skin") & ParasitesYN %in% c("No", "Yes")), aes(y = Shannon_ITS, x = ParasitesYN)) + 
+  geom_boxplot(outlier.size = NA) + theme_bw() +
+  theme(panel.grid = element_blank()) +
+  geom_point(position = position_jitter(width = 0.25), shape=21) +
+  geom_signif(comparisons=list(c("Yes", "No")), map_signif_level=FALSE, tip_length=0, textsize=3, vjust=0) +
+  xlab("Parasites detected") + ylab("Fungal Shannon diversity") +
+  facet_wrap(~sample_site_general)
+
+ggplot(subset(df11bmetadata, sample_site_general %in% c("human skin") & Autoimmune.diseaseYN %in% c("No", "Yes")), aes(y = chao_16S, x = Autoimmune.diseaseYN)) + 
+  geom_boxplot(outlier.size = NA) + theme_bw() +
+  theme(panel.grid = element_blank(), text = element_text(size = 18, colour="black"), axis.text=element_text(colour="black")) +
+  geom_point(position = position_jitter(width = 0.25), shape=21, size=2) +
+  geom_signif(comparisons=list(c("Yes", "No")), map_signif_level=FALSE, tip_length=0.01, textsize=4.5, vjust=0) +
+  xlab("Self-reported autoimmune disease") + ylab("Bacterial Chao1 richness") +
+  facet_wrap(~sample_site_general) 
+
+ggplot(subset(df11bmetadata, sample_site_general %in% c("human skin") & Autoimmune.diseaseYN %in% c("No", "Yes")), aes(y = Shannon_ITS, x = Autoimmune.diseaseYN)) + 
+  geom_boxplot(outlier.size = NA) + theme_bw() +
+  theme(panel.grid = element_blank()) +
+  geom_point(position = position_jitter(width = 0.25), shape=21) +
+  geom_signif(comparisons=list(c("Yes", "No")), map_signif_level=FALSE, tip_length=0, textsize=3, vjust=0) +
+  xlab("Autoimmune disease") + ylab("Fungal Shannon diversity") +
+  facet_wrap(~sample_site_general)
+
+ggplot(subset(df11bmetadata, sample_site_general %in% c("human skin") & Western.diseaseYN %in% c("No", "Yes")), aes(y = chao_16S, x = Western.diseaseYN)) + 
+  geom_boxplot(outlier.size = NA) + theme_bw() +
+  theme(panel.grid = element_blank(), text = element_text(size = 18, colour="black"), axis.text=element_text(colour="black")) +
+  geom_point(position = position_jitter(width = 0.25), shape=21, size=2) +
+  geom_signif(comparisons=list(c("Yes", "No")), map_signif_level=FALSE, tip_length=0.01, textsize=4.5, vjust=0) +
+  xlab("Self-reported Western disease") + ylab("Bacterial Chao1 richness") +
+  facet_wrap(~sample_site_general) 
+
+ggplot(subset(df11bmetadata, sample_site_general %in% c("human skin") & Western.diseaseYN %in% c("No", "Yes")), aes(y = Shannon_ITS, x = Western.diseaseYN)) + 
+  geom_boxplot(outlier.size = NA) + theme_bw() +
+  theme(panel.grid = element_blank()) +
+  geom_point(position = position_jitter(width = 0.25), shape=21) +
+  geom_signif(comparisons=list(c("Yes", "No")), map_signif_level=FALSE, tip_length=0, textsize=3, vjust=0) +
+  xlab("Western disease") + ylab("Fungal Shannon diversity") +
+  facet_wrap(~sample_site_general)
+
+#Fig S7 - S18
+ggplot(subset(df11bmetadata, Western.diseaseYN %in% c("No", "Yes")), aes(y = accult_score_corrected2, x = Western.diseaseYN)) + 
+  geom_boxplot(outlier.size = NA) + theme_bw() +
+  theme(panel.grid = element_blank(), text = element_text(size = 18, colour="black"), axis.text=element_text(colour="black")) +
+  geom_point(position = position_jitter(width = 0.25), shape=21, size=2) +
+  geom_signif(comparisons=list(c("Yes", "No")), map_signif_level=FALSE, tip_length=0.01, textsize=4.5, vjust=0) +
+  xlab("Self-reported Western disease") + ylab("Urbanization score")
+
+ggplot(subset(df11bmetadata, material_group %in% c("natural", "industrial")), aes(y = accult_score_corrected2, x = material_group)) + 
+  geom_boxplot(outlier.size = NA) + theme_bw() +
+  theme(panel.grid = element_blank(), text = element_text(size = 18, colour="black"), axis.text=element_text(colour="black")) +
+  geom_point(position = position_jitter(width = 0.25), shape=21, size=2) +
+  geom_signif(comparisons=list(c("natural", "industrial")), map_signif_level=FALSE, tip_length=0.01, textsize=4.5, vjust=0) +
+  xlab("Building materials") + ylab("Urbanization score")
+
+ggplot(subset(df11bmetadata, ParasitesYN %in% c("Yes", "No")), aes(y = accult_score_corrected2, x = ParasitesYN)) + 
+  geom_boxplot(outlier.size = NA) + theme_bw() +
+  theme(panel.grid = element_blank(), text = element_text(size = 18, colour="black"), axis.text=element_text(colour="black")) +
+  geom_point(position = position_jitter(width = 0.25), shape=21, size=2) +
+  geom_signif(comparisons=list(c("Yes", "No")), map_signif_level=FALSE, tip_length=0.01, textsize=4.5, vjust=0) +
+  ylab("Urbanization score") + xlab("Fecal parasites detected")
+
+ggplot(subset(df11bmetadata, InfectionYN %in% c("Yes", "No")), aes(y = accult_score_corrected2, x = AllergyYN)) + 
+  geom_boxplot(outlier.size = NA) + theme_bw() +
+  theme(panel.grid = element_blank(), text = element_text(size = 18, colour="black"), axis.text=element_text(colour="black")) +
+  geom_point(position = position_jitter(width = 0.25), shape=21, size=2) +
+  geom_signif(comparisons=list(c("Yes", "No")), map_signif_level=FALSE, tip_length=0.01, textsize=4.5, vjust=0) +
+  ylab("Urbanization score") + xlab("Self-reported asthma")
+
+ggplot(subset(df11bmetadata, InfectionYN %in% c("Yes", "No")), aes(y = accult_score_corrected2, x = AllergyYN)) + 
+  geom_boxplot(outlier.size = NA) + theme_bw() +
+  theme(panel.grid = element_blank(), text = element_text(size = 18, colour="black"), axis.text=element_text(colour="black")) +
+  geom_point(position = position_jitter(width = 0.25), shape=21, size=2) +
+  geom_signif(comparisons=list(c("Yes", "No")), map_signif_level=FALSE, tip_length=0.01, textsize=4.5, vjust=0) +
+  ylab("Urbanization score") + xlab("Self-reported allergy")
+
+ggplot(subset(df11bmetadata, InfectionYN %in% c("Yes", "No")), aes(y = accult_score_corrected2, x = Autoimmune.diseaseYN)) + 
+  geom_boxplot(outlier.size = NA) + theme_bw() +
+  theme(panel.grid = element_blank(), text = element_text(size = 18, colour="black"), axis.text=element_text(colour="black")) +
+  geom_point(position = position_jitter(width = 0.25), shape=21, size=2) +
+  geom_signif(comparisons=list(c("Yes", "No")), map_signif_level=FALSE, tip_length=0.01, textsize=4.5, vjust=0) +
+  ylab("Urbanization score") + xlab("Self-reported autoimmune disease")
+
+
+
